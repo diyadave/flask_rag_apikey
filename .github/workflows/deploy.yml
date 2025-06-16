@@ -8,22 +8,21 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Docker Buildx
+      - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}   
+          key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            rm -rf ~/flask-rag-api
-            git clone https://github.com/diyadave/flask_rag_apikey.git
-            cd flask-rag-api
-            docker stop flask-rag-api || true
-            docker rm flask-rag-api || true
-            docker build -t flask-rag-api .
-            docker run -d -p 5007:5000 --name flask-rag-api flask-rag-api
+            rm -rf ~/flask_diya_rag_api
+            git clone https://github.com/diyadave/flask_rag_apikey.git flask_diya_rag_api
+            cd flask_diya_rag_api
+            docker stop flask-diya-api || true
+            docker rm flask-diya-api || true
+            docker build -t flask-diya-api .
+            docker run -d -p 5007:5000 --name flask-diya-api flask-diya-api
