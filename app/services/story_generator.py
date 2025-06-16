@@ -61,35 +61,39 @@ class StoryGenerator:
             logger.error(f"Error in get_relevant_chunks: {str(e)}")
             return []
 
-   # In story_generator.py
     def generate_story(self, prompt, category=None):
         try:
             logger.info(f"Generating story for: {prompt[:50]}...")
             
             # Only get chunks if category is specified (reduces processing time)
-            context = ""
+            context_lines = []
             if category:
-                chunks = self.get_relevant_chunks(prompt, category, k=2)  # Reduced from 5 to 2
+                chunks = self.get_relevant_chunks(prompt, category, k=2)
                 if chunks:
-                    context = f"\n\nRelevant context:\n{'\n'.join(chunks[:2])}"
+                    context_lines = chunks[:2]
+            
+            # Build context without problematic f-string
+            context = ""
+            if context_lines:
+                context = "\n\nRelevant context:\n" + "\n".join(context_lines)
             
             # Simplified prompt template
             prompt_template = f"""Write a concise story (under 300 words) about:
-    {prompt}{context}
+{prompt}{context}
 
-    Guidelines:
-    - Focus on key elements
-    - Use clear language
-    - Keep it engaging"""
+Guidelines:
+- Focus on key elements
+- Use clear language
+- Keep it engaging"""
             
             # Faster API call with reduced parameters
             response = self.groq_llm.invoke(
                 prompt_template,
-                temperature=0.5,  # More deterministic
-                max_tokens=500    # Shorter response
+                temperature=0.5,
+                max_tokens=500
             )
             
-            return {"response": response.content}  # Removed sources
+            return {"response": response.content}
             
         except Exception as e:
             logger.error(f"Error in generate_story: {str(e)}")
