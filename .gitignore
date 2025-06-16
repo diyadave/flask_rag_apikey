@@ -1,0 +1,37 @@
+# Ignore environment files
+.env
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore logs
+*.log
+app.log
+
+
+
+# Ignore IDE folders
+.vscode/
+.idea/
+
+
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
+
+# Ignore virtual environments (if stored inside project)
+venv/
+.env/
+.env.bak/
+
+# Ignore Docker cache (optional)
+*.tar
+
+
+# Runtime data
+sessions.json
+user.json
