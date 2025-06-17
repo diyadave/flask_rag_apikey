@@ -1,28 +1,40 @@
-name: Deploy Flask App
-
+name: Deploy Flask API with Docker
 on:
   push:
-    branches:
-      - main
-
+    branches: [main]
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@v0.1.6
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.8.0
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            rm -rf ~/flask_diya_rag_api
-            git clone https://github.com/diyadave/flask_rag_apikey.git flask_diya_rag_api
-            cd flask_diya_rag_api
-            docker stop flask-diya-api || true
-            docker rm flask-diya-api || true
-            docker build -t flask-diya-api .
-            docker run -d -p 5007:5000 --name flask-diya-api flask-diya-api
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Clone from GitHub and deploy on VPS
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          rm -rf ~/flask_diya_rag_api
+          git clone https://github.com/diyadave/flask_rag_apikey.git ~/flask_diya_rag_api
+          cd ~/flask_diya_rag_api
+
+          cat <<EOT > .env
+          MEDIA_ROOT=books
+          FAISS_DB_DIR=faiss_db
+          GROQ_API_KEY=${GROQ_API_KEY}
+          GROQ_MODEL=llama3-8b-8192
+          GROQ_API_URL=https://api.groq.com/openai/v1/chat/completions
+          JWT_SECRET_KEY=${JWT_SECRET_KEY}
+          JWT_ACCESS_TOKEN_EXPIRES=3600
+          FLASK_ENV=production
+          SECRET_KEY=${JWT_SECRET_KEY}
+          EOT
+
+          docker stop flask-diya-api || true
+          docker rm flask-diya-api || true
+          docker build -t flask-diya-api .
+          docker run -d -p 5007:5000 --env-file .env --name flask-diya-api flask-diya-api
+          EOF
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}

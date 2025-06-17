@@ -13,7 +13,7 @@ class PDFProcessor:
     def __init__(self, books_dir, faiss_db_dir):
         self.books_dir = Path(books_dir)
         self.faiss_db_dir = Path(faiss_db_dir)
-        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        self.embedding_model = SentenceTransformer("/root/models/all-MiniLM-L6-v2")
         self.chunk_texts = []
         self.category_chunks = {}  # {category: [chunks]}
         
