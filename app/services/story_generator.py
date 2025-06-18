@@ -11,25 +11,30 @@ logger = logging.getLogger(__name__)
 class StoryGenerator:
     def __init__(self):
         try:
+            # Initialize Groq LLM
             self.groq_llm = ChatGroq(
-            model_name=Config.GROQ_MODEL,
-            temperature=0.7,
-            max_tokens=2000,
-            api_key=Config.GROQ_API_KEY,
-            request_timeout=60  # was 30 or less, make it 60 or 90
-        )
-
+                model_name=Config.GROQ_MODEL,
+                temperature=0.7,
+                max_tokens=2000,
+                api_key=Config.GROQ_API_KEY,
+                request_timeout=60
+            )
             
+            # Initialize PDF Processor
             self.pdf_processor = PDFProcessor(Config.BOOKS_DIR, Config.FAISS_DB_DIR)
-            self.embedding_model = self.pdf_processor.embedding_model
-            logger.info("✅ StoryGenerator initialized")
+            logger.info("✅ StoryGenerator initialized successfully")
         except Exception as e:
             logger.error(f"❌ Failed to initialize StoryGenerator: {str(e)}")
             raise
 
     def get_relevant_chunks(self, query, category=None, k=5):
         try:
-            query_embedding = self.embedding_model.encode(query)
+            if not hasattr(self.pdf_processor, 'faiss_index') or self.pdf_processor.faiss_index is None:
+                logger.warning("FAISS index not initialized, returning empty chunks")
+                return []
+                
+            query_embedding = self.pdf_processor.embedding_model.encode(query)
+            
             if category and category in self.pdf_processor.category_chunks:
                 category_indices = [
                     i for i, chunk in enumerate(self.pdf_processor.chunk_texts)
@@ -38,7 +43,7 @@ class StoryGenerator:
                 if not category_indices:
                     return []
 
-                category_embeddings = self.embedding_model.encode(
+                category_embeddings = self.pdf_processor.embedding_model.encode(
                     [self.pdf_processor.chunk_texts[i] for i in category_indices]
                 )
                 temp_index = faiss.IndexFlatL2(category_embeddings.shape[1])
@@ -55,6 +60,8 @@ class StoryGenerator:
     def generate_story(self, prompt, category=None):
         try:
             logger.info(f"📝 Generating story for: {prompt[:40]}...")
+            
+            # Get relevant context if available
             context = ""
             if category:
                 chunks = self.get_relevant_chunks(prompt, category, k=2)
@@ -69,11 +76,7 @@ Guidelines:
 - Use clear language
 - Keep it engaging"""
 
-            response = self.groq_llm.invoke(
-                prompt_template,
-                temperature=0.5,
-                max_tokens=500
-            )
+            response = self.groq_llm.invoke(prompt_template)
             return {"response": response.content}
         except Exception as e:
             logger.error(f"⚠ Story generation failed: {str(e)}")

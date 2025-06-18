@@ -1,4 +1,4 @@
-name: Deploy Flask API with Docker
+name: Deploy Flask RAG API with Docker
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Set up SSH
@@ -19,13 +20,22 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Clone from GitHub and deploy on VPS
+      - name: Deploy Application
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY_EOF'
+          set -euo pipefail
+
+          # Clean previous deployment
+          echo "➤ Removing old deployment..."
           rm -rf ~/flask_diya_rag_api
+
+          # Clone repository
+          echo "➤ Cloning repository..."
           git clone https://github.com/diyadave/flask_rag_apikey.git ~/flask_diya_rag_api
           cd ~/flask_diya_rag_api
 
+          # Setup environment
+          echo "➤ Configuring environment..."
           cat <<EOT > .env
           MEDIA_ROOT=books
           FAISS_DB_DIR=faiss_db
@@ -37,12 +47,53 @@ jobs:
           FLASK_ENV=production
           SECRET_KEY=${JWT_SECRET_KEY}
           EOT
+          chmod 600 .env
 
+          # Validate critical files
+          echo "➤ Validating resources..."
+          if [ ! -d "books" ]; then
+            echo "❌ Error: 'books' directory missing!"
+            exit 1
+          fi
+          if [ ! -d "faiss_db" ] || [ ! -f "faiss_db/index.faiss" ]; then
+            echo "❌ Error: FAISS index missing!"
+            exit 1
+          fi
+
+          # Prepare directories
+          mkdir -p model_cache
+          chmod -R 755 books faiss_db model_cache
+
+          # Docker deployment
+          echo "➤ Starting Docker deployment..."
           docker stop flask-diya-api || true
           docker rm flask-diya-api || true
-          docker build -t flask-diya-api .
-          docker run -d -p 5007:5000 --env-file .env --name flask-diya-api flask-diya-api
-          EOF
+
+          docker build -t flask-diya-api . || { echo "❌ Docker build failed"; exit 1; }
+
+          docker run -d \
+            -p 5007:5000 \
+            --env-file .env \
+            -v $(pwd)/model_cache:/root/.cache/torch/sentence_transformers \
+            -v $(pwd)/books:/app/books \
+            -v $(pwd)/faiss_db:/app/faiss_db \
+            --name flask-diya-api \
+            --restart unless-stopped \
+            flask-diya-api || { echo "❌ Container startup failed"; exit 1; }
+
+          # Health check
+          echo "➤ Verifying deployment..."
+          sleep 10
+          if docker ps | grep -q flask-diya-api; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Container not running!"
+            docker logs flask-diya-api --tail 50
+            exit 1
+          fi
+          DEPLOY_EOF
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          FLASK_ENV: production
+          FLASK_DEBUG: 0

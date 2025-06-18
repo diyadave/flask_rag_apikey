@@ -13,9 +13,10 @@ class PDFProcessor:
     def __init__(self, books_dir, faiss_db_dir):
         self.books_dir = Path(books_dir)
         self.faiss_db_dir = Path(faiss_db_dir)
-        self.embedding_model = SentenceTransformer("/root/models/all-MiniLM-L6-v2")
+        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         self.chunk_texts = []
         self.category_chunks = {}  # {category: [chunks]}
+        self.faiss_index = None
         
         try:
             # Create directories if they don't exist
@@ -62,7 +63,7 @@ class PDFProcessor:
                         continue
 
         if pdf_count == 0:
-            logger.error("No valid PDF files found in any category!")
+            logger.warning("No valid PDF files found in any category!")
         else:
             logger.info(f"Processed {pdf_count} PDFs with {len(self.chunk_texts)} chunks")
 
@@ -76,7 +77,8 @@ class PDFProcessor:
     def _create_faiss_index(self):
         """Create and save FAISS index from document chunks"""
         if not self.chunk_texts:
-            raise ValueError("No text chunks available for indexing")
+            logger.warning("No text chunks available for indexing")
+            return
             
         logger.info("Creating FAISS index...")
         
@@ -105,14 +107,3 @@ class PDFProcessor:
         except Exception as e:
             logger.error(f"Failed to create FAISS index: {str(e)}")
             raise
-
-# For testing the index creation directly
-if __name__ == "__main__":
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    
-    from config import Config
-    print("=== Testing FAISS Index Creation ===")
-    
-    processor = PDFProcessor(Config.BOOKS_DIR, Config.FAISS_DB_DIR)
-    print(f"Index created successfully in {Config.FAISS_DB_DIR}")

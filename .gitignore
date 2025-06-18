@@ -17,6 +17,7 @@ app.log
 .vscode/
 .idea/
 
+all-MiniLM-L6-v2/
 
 
 # Ignore OS generated files
