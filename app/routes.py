@@ -90,3 +90,7 @@ def generate_story():
     except Exception as e:
         logger.error(f"Error during story generation: {str(e)}")
         return jsonify({"error": "Story generation failed"}), 500
+
+@main_bp.route("/", methods=["GET"])
+def index():
+    return jsonify({"message": "Diya's RAG API is running."}), 200
