@@ -22,7 +22,7 @@ jobs:
 
       - name: Deploy Application
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY_EOF'
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} /bin/bash << 'DEPLOY_EOF'
           set -euo pipefail
 
           # Clean previous deployment
@@ -95,5 +95,3 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
-          FLASK_ENV: production
-          FLASK_DEBUG: 0
