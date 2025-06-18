@@ -21,51 +21,46 @@ jobs:
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy Application
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} /bin/bash << 'DEPLOY_EOF'
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << EOF
           set -euo pipefail
 
-          # Clean previous deployment
           echo "➤ Removing old deployment..."
           rm -rf ~/flask_diya_rag_api
 
-          # Clone repository
           echo "➤ Cloning repository..."
           git clone https://github.com/diyadave/flask_rag_apikey.git ~/flask_diya_rag_api
           cd ~/flask_diya_rag_api
 
-          # Setup environment
           echo "➤ Configuring environment..."
-          cat <<EOT > .env
-          MEDIA_ROOT=books
-          FAISS_DB_DIR=faiss_db
-          GROQ_API_KEY=${GROQ_API_KEY}
-          GROQ_MODEL=llama3-8b-8192
-          GROQ_API_URL=https://api.groq.com/openai/v1/chat/completions
-          JWT_SECRET_KEY=${JWT_SECRET_KEY}
-          JWT_ACCESS_TOKEN_EXPIRES=3600
-          FLASK_ENV=production
-          SECRET_KEY=${JWT_SECRET_KEY}
-          EOT
+          echo "MEDIA_ROOT=books" > .env
+          echo "FAISS_DB_DIR=faiss_db" >> .env
+          echo "GROQ_API_KEY=$GROQ_API_KEY" >> .env
+          echo "GROQ_MODEL=llama3-8b-8192" >> .env
+          echo "GROQ_API_URL=https://api.groq.com/openai/v1/chat/completions" >> .env
+          echo "JWT_SECRET_KEY=$JWT_SECRET_KEY" >> .env
+          echo "JWT_ACCESS_TOKEN_EXPIRES=3600" >> .env
+          echo "FLASK_ENV=production" >> .env
+          echo "SECRET_KEY=$JWT_SECRET_KEY" >> .env
           chmod 600 .env
 
-          # Validate critical files
           echo "➤ Validating resources..."
           if [ ! -d "books" ]; then
-            echo "❌ Error: 'books' directory missing!"
+            echo "❌ 'books' directory missing!"
             exit 1
           fi
-          if [ ! -d "faiss_db" ] || [ ! -f "faiss_db/index.faiss" ]; then
-            echo "❌ Error: FAISS index missing!"
+          if [ ! -f "faiss_db/index.faiss" ]; then
+            echo "❌ FAISS index missing!"
             exit 1
           fi
 
-          # Prepare directories
           mkdir -p model_cache
           chmod -R 755 books faiss_db model_cache
 
-          # Docker deployment
-          echo "➤ Starting Docker deployment..."
+          echo "➤ Starting Docker..."
           docker stop flask-diya-api || true
           docker rm flask-diya-api || true
 
@@ -79,19 +74,15 @@ jobs:
             -v $(pwd)/faiss_db:/app/faiss_db \
             --name flask-diya-api \
             --restart unless-stopped \
-            flask-diya-api || { echo "❌ Container startup failed"; exit 1; }
+            flask-diya-api || { echo "❌ Docker run failed"; exit 1; }
 
-          # Health check
-          echo "➤ Verifying deployment..."
+          echo "➤ Checking container..."
           sleep 10
           if docker ps | grep -q flask-diya-api; then
             echo "✅ Deployment successful!"
           else
-            echo "❌ Container not running!"
+            echo "❌ Container failed!"
             docker logs flask-diya-api --tail 50
             exit 1
           fi
-          DEPLOY_EOF
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          EOF
